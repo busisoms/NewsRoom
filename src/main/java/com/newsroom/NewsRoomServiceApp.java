@@ -20,6 +20,10 @@ public class NewsRoomServiceApp {
         controller.register(app);
     }
 
+    private void registerMessageReceiver(){
+        controller.registerMessageReceiver(app);
+    }
+
     private void health(){
         app.get("/health", ctx ->
                 ctx.status(200).result("OK"));
@@ -34,6 +38,7 @@ public class NewsRoomServiceApp {
         NewsRoomServiceApp service = new NewsRoomServiceApp();
         service.health();
         service.register();
+        service.registerMessageReceiver();
         service.start();
     }
 }
