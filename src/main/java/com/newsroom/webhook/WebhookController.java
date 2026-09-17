@@ -4,6 +4,7 @@ import com.newsroom.config.Config;
 import io.javalin.Javalin;
 
 import java.util.Objects;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,8 +41,12 @@ public class WebhookController {
     public void registerMessageReceiver(Javalin app){
         app.post("/webhook", ctx -> {
             try {
-                WebhookMessage payload = getPayload(ctx.body());
-                log.info("Received message: {}", payload);
+                // Meta also posts status updates and other fields here, which carry no message.
+                // Always ack with 200, otherwise Meta retries and may disable the webhook.
+                getPayload(ctx.body()).ifPresentOrElse(
+                        payload -> log.info("Received message: {}", payload),
+                        () -> log.debug("Ignoring webhook event without a message"));
+                ctx.status(200);
             } catch(Exception e){
                 ctx.status(400).result("Invalid request body format");
                 log.warn("Failed to process payload body: {}", e);
@@ -50,20 +55,25 @@ public class WebhookController {
     }
 
 
-    private WebhookMessage getPayload(String body){
+    private Optional<WebhookMessage> getPayload(String body){
         try {
             ObjectMapper mapper = new ObjectMapper();
             JsonNode root = mapper.readTree(body);
 
-            JsonNode messageNode = root.path("entry").get(0)
-                    .path("changes").get(0)
+            // path() never returns null, so events without entry/changes/messages end up as a missing node
+            JsonNode messageNode = root.path("entry").path(0)
+                    .path("changes").path(0)
                     .path("value")
-                    .path("messages").get(0);
+                    .path("messages").path(0);
+
+            if (messageNode.isMissingNode()) {
+                return Optional.empty();
+            }
 
             String fromNumber = messageNode.path("from").asText();
             String textBody = messageNode.path("text").path("body").asText();
 
-            return new WebhookMessage(fromNumber, textBody);
+            return Optional.of(new WebhookMessage(fromNumber, textBody));
 
         } catch (JsonProcessingException e) {
                 throw new RuntimeException(e);
