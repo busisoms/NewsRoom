@@ -7,9 +7,15 @@ import com.newsroom.whatsapp.WhatsAppClient;
 import com.newsroom.session.SessionStore;
 import io.javalin.Javalin;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,19 +69,27 @@ public class WebhookController {
      * a message (status updates, template updates)
      * since a non-200 makes Meta retry and can get the webhook disabled.
      */
-    public void registerMessageReceiver(Javalin app){
+    public void registerMessageReceiver(Javalin app) {
         app.post("/webhook", ctx -> {
             try {
-                // Meta also posts status updates and other fields here, which carry no message.
-                // Always ack with 200, otherwise Meta retries and may disable the webhook.
-                getPayload(ctx.body()).ifPresentOrElse(
+                String body = ctx.body();
+                String signature = ctx.header("X-Hub-Signature-256");
+
+                if (!isValidSignature(body, signature)) {
+                    log.warn("Invalid webhook signature; rejecting request");
+                    ctx.status(401).result("Invalid signature");
+                    return;
+                }
+
+                getPayload(body).ifPresentOrElse(
                         payload -> {
                             log.info("Received message: {}", payload);
                             handleMessages(payload);
                         },
                         () -> log.debug("Ignoring webhook event without a message"));
+
                 ctx.status(200);
-            } catch(Exception e){
+            } catch (Exception e) {
                 ctx.status(400).result("Invalid request body format");
                 log.warn("Failed to process payload body", e);
             }
@@ -124,5 +138,38 @@ public class WebhookController {
         } catch (JsonProcessingException e) {
                 throw new RuntimeException(e);
             }
+    }
+
+    private boolean isValidSignature(String body, String signatureHeader) {
+        if (body == null
+                || signatureHeader == null
+                || !signatureHeader.startsWith("sha256=")) {
+            return false;
+        }
+
+        try {
+            String secret = config.metaAppSecret();
+            if (secret == null) {
+                return false;
+            }
+
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(
+                    secret.getBytes(StandardCharsets.UTF_8),
+                    "HmacSHA256"));
+
+            byte[] expected = mac.doFinal(body.getBytes(StandardCharsets.UTF_8));
+
+            byte[] provided = HexFormat.of()
+                    .parseHex(signatureHeader.substring("sha256=".length()));
+
+            return MessageDigest.isEqual(expected, provided);
+        } catch (IllegalArgumentException e) {
+            log.warn("Malformed webhook signature header");
+            return false;
+        } catch (Exception e) {
+            log.warn("Failed to validate webhook signature", e);
+            return false;
+        }
     }
 }

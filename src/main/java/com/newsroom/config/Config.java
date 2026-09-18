@@ -9,6 +9,7 @@ package com.newsroom.config;
  * @param metaPhoneNumberId the WhatsApp Business phone number ID messages are sent from
  * @param activeMqBrokerUrl connection URL for the ActiveMQ broker
  * @param webhookVerifyToken token Meta sends back during the GET /webhook verify handshake
+ * @param metaAppSecret app secret used to verify the HMAC-SHA256 signature on inbound webhooks
  * @param sessionTimeoutMinutes how long a user's conversation session stays alive without activity
  */
 public record Config(
@@ -17,6 +18,7 @@ public record Config(
         String metaPhoneNumberId,
         String activeMqBrokerUrl,
         String webhookVerifyToken,
+        String metaAppSecret,
         int sessionTimeoutMinutes
 ) {
 
@@ -31,15 +33,21 @@ public record Config(
         String phoneNumberId = env("META_PHONE_NUMBER_ID", null);
         String broker = env("ACTIVEMQ_BROKER_URL", "tcp://localhost:61616");
         String webhookToken = env("WEBHOOK_VERIFY_TOKEN", null);
+        String metaAppSecret = env("META_APP_SECRET", null);
         String timeout = env("SESSION_TIMEOUT_MINUTES", "30");
 
         String[] keys = {
                 "PORT", "META_ACCESS_TOKEN",
                 "META_PHONE_NUMBER_ID", "ACTIVEMQ_BROKER_URL",
-                "WEBHOOK_VERIFY_TOKEN", "SESSION_TIMEOUT_MINUTES"
+                "WEBHOOK_VERIFY_TOKEN", "META_APP_SECRET",
+                "SESSION_TIMEOUT_MINUTES"
         };
 
-        String[] values = {port, accessToken, phoneNumberId, broker, webhookToken, timeout};
+        String[] values = {
+                port, accessToken, phoneNumberId,
+                broker, webhookToken, metaAppSecret, timeout
+        };
+
         String missing = missingKeys(keys, values);
 
         if (!missing.isEmpty()) {
@@ -52,6 +60,7 @@ public record Config(
                 phoneNumberId,
                 broker,
                 webhookToken,
+                metaAppSecret,
                 Integer.parseInt(timeout)
         );
     }
