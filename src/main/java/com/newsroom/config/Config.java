@@ -9,7 +9,8 @@ public record Config(
         String metaAccessToken,
         String metaPhoneNumberId,
         String activeMqBrokerUrl,
-        String webhookVerifyToken
+        String webhookVerifyToken,
+        int sessionTimeoutMinutes
 ) {
 
     public static Config fromEnv() {
@@ -18,7 +19,8 @@ public record Config(
                 env("META_ACCESS_TOKEN", null),
                 env("META_PHONE_NUMBER_ID", null),
                 env("ACTIVEMQ_BROKER_URL", "tcp://localhost:61616"),
-                env("WEBHOOK_VERIFY_TOKEN", null)
+                env("WEBHOOK_VERIFY_TOKEN", null),
+                Integer.parseInt(env("SESSION_TIMEOUT_MINUTES", "30"))
         );
     }
 

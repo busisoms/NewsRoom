@@ -2,6 +2,8 @@ package com.newsroom;
 
 import com.newsroom.config.Config;
 import com.newsroom.webhook.WebhookController;
+import com.newsroom.whatsapp.WhatsAppClient;
+import com.newsroom.session.SessionStore;
 import io.javalin.Javalin;
 
 public class NewsRoomServiceApp {
@@ -13,7 +15,9 @@ public class NewsRoomServiceApp {
     public NewsRoomServiceApp() {
         this.config = Config.fromEnv();
         this.app = Javalin.create();
-        this.controller = new WebhookController(config);
+        WhatsAppClient outboundClient = new WhatsAppClient(config);
+        SessionStore store = new SessionStore(config.sessionTimeoutMinutes());
+        this.controller = new WebhookController(config, store, outboundClient);
     }
 
     private void register(){
