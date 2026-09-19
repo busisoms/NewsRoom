@@ -18,6 +18,7 @@
         <jackson.version>2.17.2</jackson.version>
         <activemq.version>5.18.3</activemq.version>
         <slf4j.version>2.0.13</slf4j.version>
+        <junit.version>5.10.2</junit.version>
     </properties>
 
     <dependencies>
@@ -45,6 +46,13 @@
             <artifactId>slf4j-simple</artifactId>
             <version>${slf4j.version}</version>
         </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -56,6 +64,13 @@
                 <configuration>
                     <release>${maven.compiler.release}</release>
                 </configuration>
+            </plugin>
+
+            <!-- mvn test -> surefire 3.x is needed to discover JUnit 5 tests; older versions run 0 tests silently -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.2.5</version>
             </plugin>
 
             <!-- mvn exec:java -> fast local run during development -->
