@@ -1,8 +1,10 @@
 package com.newsroom.webhook;
 
 import com.newsroom.config.Config;
+import com.newsroom.conversation.ConversationEngine;
+import com.newsroom.conversation.Decision;
+import com.newsroom.conversation.Reply;
 import com.newsroom.session.ConversationState;
-import com.newsroom.whatsapp.Button;
 import com.newsroom.whatsapp.WhatsAppClient;
 import com.newsroom.session.SessionStore;
 import io.javalin.Javalin;
@@ -10,7 +12,6 @@ import io.javalin.Javalin;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
-import java.util.List;
 import java.util.Objects;
 
 import javax.crypto.Mac;
@@ -100,14 +101,19 @@ public class WebhookController {
      */
     public void handleMessages(WebhookMessage message){
         String user = message.from();
-
         ConversationState currentState = store.onMessage(user);
-        if (currentState == ConversationState.NONE) {
-            store.updateState(user, ConversationState.AWAITING_OPTION);
-            client.sendButtons(user, "Welcome to NewsRoom bot, how can I help you today?",
-                    List.of(new Button("menu_weather", "Weather"),
-                            new Button("menu_sports", "Sports"),
-                            new Button("menu_news", "News")));
+        Decision decision = ConversationEngine.decide(currentState, message);
+        store.updateState(user, decision.nextState());
+        if (decision.reply() != null) {
+            send(user, decision.reply());
+        }
+
+    }
+
+    private void send(String to, Reply reply) {
+        switch (reply) {
+            case Reply.Text text -> client.sendText(to, text.body());
+            case Reply.Buttons buttons -> client.sendButtons(to, buttons.body(), buttons.buttons());
         }
     }
 
