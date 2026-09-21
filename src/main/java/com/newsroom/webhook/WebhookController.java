@@ -12,7 +12,6 @@ import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -20,9 +19,6 @@ import javax.crypto.spec.SecretKeySpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.core.JsonProcessingException;
 
 
 /**
@@ -81,7 +77,7 @@ public class WebhookController {
                     return;
                 }
 
-                getPayload(body).ifPresentOrElse(
+                WebhookParser.parse(body).ifPresentOrElse(
                         payload -> {
                             log.info("Received message: {}", payload);
                             handleMessages(payload);
@@ -113,31 +109,6 @@ public class WebhookController {
                             new Button("menu_sports", "Sports"),
                             new Button("menu_news", "News")));
         }
-    }
-
-    private Optional<WebhookMessage> getPayload(String body){
-        try {
-            ObjectMapper mapper = new ObjectMapper();
-            JsonNode root = mapper.readTree(body);
-
-            // path() never returns null, so events without entry/changes/messages end up as a missing node
-            JsonNode messageNode = root.path("entry").path(0)
-                    .path("changes").path(0)
-                    .path("value")
-                    .path("messages").path(0);
-
-            if (messageNode.isMissingNode()) {
-                return Optional.empty();
-            }
-
-            String fromNumber = messageNode.path("from").asText();
-            String textBody = messageNode.path("text").path("body").asText();
-
-            return Optional.of(new WebhookMessage(fromNumber, textBody));
-
-        } catch (JsonProcessingException e) {
-                throw new RuntimeException(e);
-            }
     }
 
     private boolean isValidSignature(String body, String signatureHeader) {
