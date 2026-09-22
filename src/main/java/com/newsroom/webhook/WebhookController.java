@@ -1,18 +1,14 @@
 package com.newsroom.webhook;
 
 import com.newsroom.config.Config;
-import com.newsroom.conversation.ConversationEngine;
-import com.newsroom.conversation.Decision;
-import com.newsroom.conversation.Reply;
-import com.newsroom.session.ConversationState;
-import com.newsroom.whatsapp.WhatsAppClient;
-import com.newsroom.session.SessionStore;
+import com.newsroom.queue.InboundMessagePublisher;
 import io.javalin.Javalin;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.Objects;
+import java.util.Optional;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -24,21 +20,26 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Handles Meta's WhatsApp webhook: the GET verification handshake, and the POST
- * receiver that parses inbound messages, walks the caller through the conversation
- * state machine, and replies via {@link WhatsAppClient}.
+ * receiver that verifies the signature, parses the inbound message, and puts it
+ * on the queue via {@link InboundMessagePublisher}.
+ *
+ * <p>It never runs conversation logic or calls Meta itself, so the webhook
+ * responds promptly; replies are sent by the queue's consumer.
  */
 public class WebhookController {
 
     private final Config config;
-    private final WhatsAppClient client;
-    private final SessionStore store;
+    private final InboundMessagePublisher producer;
     private final Logger log = LoggerFactory
             .getLogger(WebhookController.class);
 
-    public WebhookController(Config config, SessionStore store, WhatsAppClient client) {
+    /**
+     * @param config supplies the verify token and app secret
+     * @param producer puts parsed messages on the inbound queue
+     */
+    public WebhookController(Config config, InboundMessagePublisher producer) {
+        this.producer = producer;
         this.config = config;
-        this.store = store;
-        this.client = client;
     }
 
     /**
@@ -61,10 +62,17 @@ public class WebhookController {
     }
 
     /**
-     * Registers the POST /webhook receiver.
-     * Always acks with 200 even for events without
-     * a message (status updates, template updates)
-     * since a non-200 makes Meta retry and can get the webhook disabled.
+     * Registers the POST /webhook receiver. Responds with:
+     * <ul>
+     *   <li>200 once the message is on the queue, and also for events without a
+     *       message (status updates, template updates), which are ignored</li>
+     *   <li>401 when the signature is missing or invalid</li>
+     *   <li>400 when the body can't be parsed</li>
+     *   <li>500 when the message can't be enqueued (e.g. the broker is down),
+     *       so Meta retries it later instead of it being lost</li>
+     * </ul>
+     * Any non-200 makes Meta retry, and sustained failures can get the webhook
+     * disabled, so 500 is reserved for failures a retry can fix.
      */
     public void registerMessageReceiver(Javalin app) {
         app.post("/webhook", ctx -> {
@@ -78,43 +86,34 @@ public class WebhookController {
                     return;
                 }
 
-                WebhookParser.parse(body).ifPresentOrElse(
-                        payload -> {
-                            log.info("Received message: {}", payload);
-                            handleMessages(payload);
-                        },
-                        () -> log.debug("Ignoring webhook event without a message"));
+                Optional<WebhookMessage> payload;
+                try {
+                    payload = WebhookParser.parse(body);
+                } catch (RuntimeException e) {
+                    log.warn("Failed to parse payload body", e);
+                    ctx.status(400).result("Invalid request body format");
+                    return;
+                }
 
-                ctx.status(200);
+                if (payload.isEmpty()) {
+                    log.debug("Ignoring webhook event without a message");
+                    ctx.status(200);
+                    return;
+                }
+
+                try {
+                    producer.enqueue(payload.get());
+                    ctx.status(200);
+                } catch (RuntimeException e) {
+                    log.error("Failed to enqueue message {}; returning 500 so Meta retries", payload.get().wamId(), e);
+                    ctx.status(500);
+                }
+
             } catch (Exception e) {
                 ctx.status(400).result("Invalid request body format");
                 log.warn("Failed to process payload body", e);
             }
         });
-    }
-
-    /**
-     * Advances a caller who is at the start of the conversation ({@code NONE}) into the
-     * menu: sends the Weather/Sports/News options and moves them to {@code AWAITING_OPTION}.
-     *
-     * @param message the caller's inbound message
-     */
-    public void handleMessages(WebhookMessage message){
-        String user = message.from();
-        ConversationState currentState = store.onMessage(user);
-        Decision decision = ConversationEngine.decide(currentState, message);
-        store.updateState(user, decision.nextState());
-        if (decision.reply() != null) {
-            send(user, decision.reply());
-        }
-
-    }
-
-    private void send(String to, Reply reply) {
-        switch (reply) {
-            case Reply.Text text -> client.sendText(to, text.body());
-            case Reply.Buttons buttons -> client.sendButtons(to, buttons.body(), buttons.buttons());
-        }
     }
 
     private boolean isValidSignature(String body, String signatureHeader) {
