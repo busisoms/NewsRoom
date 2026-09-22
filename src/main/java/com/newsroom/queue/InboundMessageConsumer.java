@@ -81,13 +81,17 @@ public class InboundMessageConsumer implements AutoCloseable{
      * successful acknowledge also ack this failed message, losing it.
      */
     private void onMessage(Message m) {
+        // Until the body is parsed there's no wamid, so failures fall back to the JMS id
+        String id = jmsMessageId(m);
+        int delivery = deliveryCount(m);
         try {
             String json = m.getBody(String.class);
             WebhookMessage msg = objectMapper.readValue(json, WebhookMessage.class);
-            handle(msg);
+            id = msg.wamId();
+            handle(msg, delivery);
             m.acknowledge();
         } catch (Exception e) {
-            log.warn("Processing failed for message; will be redelivered", e);
+            log.warn("Processing failed for {} delivery={}; will be redelivered", id, delivery, e);
             try {
                 context.recover();
             } catch (JMSRuntimeException re) {
@@ -103,9 +107,14 @@ public class InboundMessageConsumer implements AutoCloseable{
      * <p>Sends before updating state, so a crash in between means a redelivery
      * resends the reply (harmless) rather than skipping it.
      *
+     * <p>Logs one line per message with the wamid, state transition, reply kind,
+     * and delivery count. Never the message text or phone number.
+     *
      * @param message the caller's inbound message
+     * @param delivery how many times the broker has delivered this message (1 on first
+     *                 delivery, 0 if unknown)
      */
-    public void handle(WebhookMessage message){
+    public void handle(WebhookMessage message, int delivery){
         String user = message.from();
         ConversationState currentState = store.onMessage(user);
         Decision decision = ConversationEngine.decide(currentState, message);
@@ -113,6 +122,35 @@ public class InboundMessageConsumer implements AutoCloseable{
             send(user, decision.reply());
         }
         store.updateState(user, decision.nextState());
+
+        log.info("Processed {} {} -> {} reply={} delivery={}", message.wamId(),
+                currentState, decision.nextState(), replyKind(decision.reply()), delivery);
+    }
+
+    private static String replyKind(Reply reply) {
+        if (reply == null) {
+            return "none";
+        }
+        return switch (reply) {
+            case Reply.Text text -> "TEXT";
+            case Reply.Buttons buttons -> "BUTTONS";
+        };
+    }
+
+    private static String jmsMessageId(Message m) {
+        try {
+            return m.getJMSMessageID();
+        } catch (JMSException e) {
+            return "unknown";
+        }
+    }
+
+    private static int deliveryCount(Message m) {
+        try {
+            return m.getIntProperty("JMSXDeliveryCount");
+        } catch (JMSException | NumberFormatException e) {
+            return 0;
+        }
     }
 
     private void send(String to, Reply reply) {
