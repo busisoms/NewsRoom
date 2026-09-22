@@ -1,6 +1,7 @@
 package com.newsroom;
 
 import com.newsroom.config.Config;
+import com.newsroom.queue.InboundMessageConsumer;
 import com.newsroom.webhook.WebhookController;
 import com.newsroom.whatsapp.WhatsAppClient;
 import com.newsroom.session.SessionStore;
@@ -10,14 +11,17 @@ public class NewsRoomServiceApp {
     private final Config config;
     private final Javalin app;
     private final WebhookController controller;
+    private final SessionStore store;
+    private final InboundMessageConsumer consumer;
 
 
     public NewsRoomServiceApp() {
         this.config = Config.fromEnv();
         this.app = Javalin.create();
         WhatsAppClient outboundClient = new WhatsAppClient(config);
-        SessionStore store = new SessionStore(config.sessionTimeoutMinutes());
+        this.store = new SessionStore(config.sessionTimeoutMinutes());
         this.controller = new WebhookController(config, store, outboundClient);
+        this.consumer = new InboundMessageConsumer(config, outboundClient, store);
     }
 
     private void register(){
@@ -35,6 +39,7 @@ public class NewsRoomServiceApp {
     }
 
     private void start(){
+        consumer.start();
         app.start(config.port());
     }
 

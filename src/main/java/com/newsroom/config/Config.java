@@ -8,6 +8,7 @@ package com.newsroom.config;
  * @param metaAccessToken bearer token used to call the Meta WhatsApp Cloud API
  * @param metaPhoneNumberId the WhatsApp Business phone number ID messages are sent from
  * @param activeMqBrokerUrl connection URL for the ActiveMQ broker
+ * @param activeMqBrokerQueue name of the queue the webhook publishes inbound messages to
  * @param webhookVerifyToken token Meta sends back during the GET /webhook verify handshake
  * @param metaAppSecret app secret used to verify the HMAC-SHA256 signature on inbound webhooks
  * @param sessionTimeoutMinutes how long a user's conversation session stays alive without activity
@@ -17,6 +18,7 @@ public record Config(
         String metaAccessToken,
         String metaPhoneNumberId,
         String activeMqBrokerUrl,
+        String activeMqBrokerQueue,
         String webhookVerifyToken,
         String metaAppSecret,
         int sessionTimeoutMinutes
@@ -32,6 +34,7 @@ public record Config(
         String accessToken = env("META_ACCESS_TOKEN", null);
         String phoneNumberId = env("META_PHONE_NUMBER_ID", null);
         String broker = env("ACTIVEMQ_BROKER_URL", "tcp://localhost:61616");
+        String queue = env("ACTIVEMQ_BROKER_QUEUE", "inbound-message-queue");
         String webhookToken = env("WEBHOOK_VERIFY_TOKEN", null);
         String metaAppSecret = env("META_APP_SECRET", null);
         String timeout = env("SESSION_TIMEOUT_MINUTES", "30");
@@ -39,13 +42,14 @@ public record Config(
         String[] keys = {
                 "PORT", "META_ACCESS_TOKEN",
                 "META_PHONE_NUMBER_ID", "ACTIVEMQ_BROKER_URL",
-                "WEBHOOK_VERIFY_TOKEN", "META_APP_SECRET",
-                "SESSION_TIMEOUT_MINUTES"
+                "ACTIVEMQ_BROKER_QUEUE", "WEBHOOK_VERIFY_TOKEN",
+                "META_APP_SECRET", "SESSION_TIMEOUT_MINUTES"
         };
 
         String[] values = {
                 port, accessToken, phoneNumberId,
-                broker, webhookToken, metaAppSecret, timeout
+                broker, queue, webhookToken,
+                metaAppSecret, timeout
         };
 
         String missing = missingKeys(keys, values);
@@ -55,13 +59,10 @@ public record Config(
         }
 
         return new Config(
-                Integer.parseInt(port),
-                accessToken,
-                phoneNumberId,
-                broker,
-                webhookToken,
-                metaAppSecret,
-                Integer.parseInt(timeout)
+                Integer.parseInt(port), accessToken,
+                phoneNumberId, broker,
+                queue, webhookToken,
+                metaAppSecret, Integer.parseInt(timeout)
         );
     }
 
