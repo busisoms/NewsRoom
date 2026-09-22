@@ -64,8 +64,24 @@ wait_until_healthy() {
     exit 1
 }
 
+start_broker() {
+    echo "Starting ActiveMQ..."
+    docker compose up -d activemq
+
+    for attempt in $(seq 1 30); do
+        if (echo > /dev/tcp/localhost/61616) 2>/dev/null; then
+            return 0
+        fi
+        sleep 1
+    done
+
+    echo "ActiveMQ didn't accept connections on 61616 after 30 seconds. Check: docker compose logs activemq"
+    exit 1
+}
+
 
 load_env
+start_broker
 build
 
 # Clean up on any exit; Ctrl+C (INT) and TERM exit first so cleanup runs once
