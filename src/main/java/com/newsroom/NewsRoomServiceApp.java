@@ -1,6 +1,7 @@
 package com.newsroom;
 
 import com.newsroom.config.Config;
+import com.newsroom.queue.DedupeStore;
 import com.newsroom.queue.InboundMessageConsumer;
 import com.newsroom.queue.InboundMessagePublisher;
 import com.newsroom.webhook.WebhookController;
@@ -23,7 +24,8 @@ public class NewsRoomServiceApp {
         this.controller = new WebhookController(config, producer);
         WhatsAppClient outboundClient = new WhatsAppClient(config);
         SessionStore store = new SessionStore(config.sessionTimeoutMinutes());
-        this.consumer = new InboundMessageConsumer(config, outboundClient, store);
+        DedupeStore dedupe = new DedupeStore(config.dedupeWindowMinutes());
+        this.consumer = new InboundMessageConsumer(config, outboundClient, store, dedupe);
     }
 
     private void register(){

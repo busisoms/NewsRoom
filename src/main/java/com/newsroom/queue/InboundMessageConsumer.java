@@ -30,6 +30,7 @@ public class InboundMessageConsumer implements AutoCloseable{
     private final Config config;
     private final WhatsAppClient client;
     private final SessionStore store;
+    private final DedupeStore dedupe;
     private final ObjectMapper objectMapper = new ObjectMapper();
     private JMSContext context;
     private final Logger log = LoggerFactory
@@ -41,12 +42,13 @@ public class InboundMessageConsumer implements AutoCloseable{
      * @param config supplies the broker URL and queue name
      * @param client sends replies back to WhatsApp
      * @param store holds each caller's conversation state
+     * @param dedupe tracks which wamids have already been processed
      */
-    public InboundMessageConsumer(Config config, WhatsAppClient client, SessionStore store) {
+    public InboundMessageConsumer(Config config, WhatsAppClient client, SessionStore store, DedupeStore dedupe) {
         this.config = config;
         this.client = client;
         this.store = store;
-
+        this.dedupe = dedupe;
     }
 
     /**
@@ -104,6 +106,12 @@ public class InboundMessageConsumer implements AutoCloseable{
      * Runs one message through the conversation: looks up the caller's state,
      * asks the engine for a decision, sends any reply, then stores the next state.
      *
+     * <p>Skips the message entirely if its wamid was already processed; covers
+     * both a Meta retry (a second, independent queue message with the same wamid) and
+     * an ActiveMQ redelivery of the same message. The wamid is only marked processed
+     * once handling finishes without error, so a redelivery that follows a genuine
+     * failure still goes through instead of being skipped as a false duplicate.
+     *
      * <p>Sends before updating state, so a crash in between means a redelivery
      * resends the reply (harmless) rather than skipping it.
      *
@@ -115,6 +123,11 @@ public class InboundMessageConsumer implements AutoCloseable{
      *                 delivery, 0 if unknown)
      */
     public void handle(WebhookMessage message, int delivery){
+        if (dedupe.isDuplicate(message.wamId())) {
+            log.info("Skipped duplicate {} delivery={}", message.wamId(), delivery);
+            return;
+        }
+
         String user = message.from();
         ConversationState currentState = store.onMessage(user);
         Decision decision = ConversationEngine.decide(currentState, message);
@@ -122,6 +135,7 @@ public class InboundMessageConsumer implements AutoCloseable{
             send(user, decision.reply());
         }
         store.updateState(user, decision.nextState());
+        dedupe.markProcessed(message.wamId());
 
         log.info("Processed {} {} -> {} reply={} lookup={} delivery={}", message.wamId(),
                 currentState, decision.nextState(), replyKind(decision.reply()), lookupKind(decision.lookup()), delivery);

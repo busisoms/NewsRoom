@@ -12,6 +12,8 @@ package com.newsroom.config;
  * @param webhookVerifyToken token Meta sends back during the GET /webhook verify handshake
  * @param metaAppSecret app secret used to verify the HMAC-SHA256 signature on inbound webhooks
  * @param sessionTimeoutMinutes how long a user's conversation session stays alive without activity
+ * @param dedupeWindowMinutes how long a processed wamid is remembered, to skip a retried or
+ *                            redelivered copy of the same message
  */
 public record Config(
         int port,
@@ -21,7 +23,8 @@ public record Config(
         String activeMqBrokerQueue,
         String webhookVerifyToken,
         String metaAppSecret,
-        int sessionTimeoutMinutes
+        int sessionTimeoutMinutes,
+        int dedupeWindowMinutes
 ) {
 
     /**
@@ -38,18 +41,20 @@ public record Config(
         String webhookToken = env("WEBHOOK_VERIFY_TOKEN", null);
         String metaAppSecret = env("META_APP_SECRET", null);
         String timeout = env("SESSION_TIMEOUT_MINUTES", "30");
+        String dedupeWindow = env("DEDUPE_WINDOW_MINUTES", "5");
 
         String[] keys = {
                 "PORT", "META_ACCESS_TOKEN",
                 "META_PHONE_NUMBER_ID", "ACTIVEMQ_BROKER_URL",
                 "ACTIVEMQ_BROKER_QUEUE", "WEBHOOK_VERIFY_TOKEN",
-                "META_APP_SECRET", "SESSION_TIMEOUT_MINUTES"
+                "META_APP_SECRET", "SESSION_TIMEOUT_MINUTES",
+                "DEDUPE_WINDOW_MINUTES"
         };
 
         String[] values = {
                 port, accessToken, phoneNumberId,
                 broker, queue, webhookToken,
-                metaAppSecret, timeout
+                metaAppSecret, timeout, dedupeWindow
         };
 
         String missing = missingKeys(keys, values);
@@ -62,7 +67,8 @@ public record Config(
                 Integer.parseInt(port), accessToken,
                 phoneNumberId, broker,
                 queue, webhookToken,
-                metaAppSecret, Integer.parseInt(timeout)
+                metaAppSecret, Integer.parseInt(timeout),
+                Integer.parseInt(dedupeWindow)
         );
     }
 
