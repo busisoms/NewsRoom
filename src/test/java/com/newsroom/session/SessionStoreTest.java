@@ -63,12 +63,12 @@ class SessionStoreTest {
 
     @Test
     void eachMessageRefreshesTheTimeout() {
-        store.updateState(PHONE, ConversationState.AWAITING_DETAILS);
+        store.updateState(PHONE, ConversationState.AWAITING_CITY);
 
         // Three gaps of 20 minutes: 60 minutes total, but never idle for more than 30.
         for (int i = 0; i < 3; i++) {
             clock.advance(Duration.ofMinutes(20));
-            assertEquals(ConversationState.AWAITING_DETAILS, store.onMessage(PHONE));
+            assertEquals(ConversationState.AWAITING_CITY, store.onMessage(PHONE));
         }
     }
 
@@ -78,9 +78,9 @@ class SessionStoreTest {
         clock.advance(Duration.ofMinutes(TIMEOUT_MINUTES + 1));
         assertEquals(ConversationState.NONE, store.onMessage(PHONE));
 
-        store.updateState(PHONE, ConversationState.AWAITING_DETAILS);
+        store.updateState(PHONE, ConversationState.AWAITING_CITY);
 
-        assertEquals(ConversationState.AWAITING_DETAILS, store.onMessage(PHONE));
+        assertEquals(ConversationState.AWAITING_CITY, store.onMessage(PHONE));
     }
 
     @Test

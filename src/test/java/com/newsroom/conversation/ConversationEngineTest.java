@@ -34,7 +34,7 @@ class ConversationEngineTest {
     }
 
     @ParameterizedTest
-    @EnumSource(value = ConversationState.class, names = {"AWAITING_OPTION", "AWAITING_DETAILS"})
+    @EnumSource(value = ConversationState.class, names = {"AWAITING_CITY", "AWAITING_TOPIC", "AWAITING_LEAGUE"})
     void waitingStatesStayPutAndSendNothingForAnyMessageType(ConversationState state) {
         for (MessageType type : MessageType.values()) {
             Decision decision = ConversationEngine.decide(state, messageOf(type));
@@ -42,6 +42,47 @@ class ConversationEngineTest {
             assertEquals(state, decision.nextState(), "state changed for " + type);
             assertNull(decision.reply(), "reply sent for " + type);
         }
+    }
+
+    @Test
+    void awaitingOptionResendsTheMenuAndStaysPutForUnsupportedMessages() {
+        Decision decision = ConversationEngine.decide(ConversationState.AWAITING_OPTION, messageOf(MessageType.UNSUPPORTED));
+
+        assertEquals(ConversationState.AWAITING_OPTION, decision.nextState());
+        assertEquals(MENU, decision.reply());
+    }
+
+    @Test
+    void awaitingOptionResendsTheMenuForAnUnrecognisedButtonId() {
+        Decision decision = ConversationEngine.decide(ConversationState.AWAITING_OPTION, buttonMessage("menu_garbage"));
+
+        assertEquals(ConversationState.AWAITING_OPTION, decision.nextState());
+        assertEquals(MENU, decision.reply());
+    }
+
+    @Test
+    void weatherButtonMovesToAwaitingCityAndAsksWhichCity() {
+        Decision decision = ConversationEngine.decide(ConversationState.AWAITING_OPTION, buttonMessage("menu_weather"));
+
+        assertEquals(ConversationState.AWAITING_CITY, decision.nextState());
+        assertEquals(new Reply.Text("Which city?"), decision.reply());
+    }
+
+    @Test
+    void newsButtonMovesToAwaitingTopicAndAsksWhatTopic() {
+        Decision decision = ConversationEngine.decide(ConversationState.AWAITING_OPTION, buttonMessage("menu_news"));
+
+        assertEquals(ConversationState.AWAITING_TOPIC, decision.nextState());
+        assertEquals(new Reply.Text("What topic?"), decision.reply());
+    }
+
+    @Test
+    void sportsButtonMovesToAwaitingLeagueAndAsksWhichLeague() {
+        Decision decision = ConversationEngine.decide(ConversationState.AWAITING_OPTION, buttonMessage("menu_sports"));
+
+        assertEquals(ConversationState.AWAITING_LEAGUE, decision.nextState());
+        Reply.Buttons league = assertInstanceOf(Reply.Buttons.class, decision.reply());
+        assertEquals("Which league?", league.body());
     }
 
     @Test
@@ -65,11 +106,40 @@ class ConversationEngineTest {
         assertEquals(menu.buttons().size(), distinct);
     }
 
+    @Test
+    void leagueMenuRespectsWhatsAppButtonLimits() {
+        Decision decision = ConversationEngine.decide(ConversationState.AWAITING_OPTION, buttonMessage("menu_sports"));
+        Reply.Buttons league = assertInstanceOf(Reply.Buttons.class, decision.reply());
+
+        assertTrue(league.buttons().size() <= 3, "WhatsApp allows at most 3 reply buttons");
+        for (Button button : league.buttons()) {
+            assertTrue(button.title().length() <= 20, "Title too long: " + button.title());
+        }
+    }
+
+    @Test
+    void leagueMenuButtonIdsAreUnique() {
+        Decision decision = ConversationEngine.decide(ConversationState.AWAITING_OPTION, buttonMessage("menu_sports"));
+        Reply.Buttons league = assertInstanceOf(Reply.Buttons.class, decision.reply());
+
+        long distinct = league.buttons().stream().map(Button::id).distinct().count();
+
+        assertEquals(league.buttons().size(), distinct);
+    }
+
     private static WebhookMessage messageOf(MessageType type) {
         return switch (type) {
-            case TEXT -> new WebhookMessage("wamid.T1", PHONE, MessageType.TEXT, "hello", null);
-            case BUTTON -> new WebhookMessage("wamid.B1", PHONE, MessageType.BUTTON, null, "menu_weather");
+            case TEXT -> textMessage("hello");
+            case BUTTON -> buttonMessage("menu_weather");
             case UNSUPPORTED -> new WebhookMessage("wamid.U1", PHONE, MessageType.UNSUPPORTED, null, null);
         };
+    }
+
+    private static WebhookMessage textMessage(String body) {
+        return new WebhookMessage("wamid.T1", PHONE, MessageType.TEXT, body, null);
+    }
+
+    private static WebhookMessage buttonMessage(String id) {
+        return new WebhookMessage("wamid.B1", PHONE, MessageType.BUTTON, null, id);
     }
 }
