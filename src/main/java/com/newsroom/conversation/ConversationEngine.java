@@ -8,12 +8,24 @@ import com.newsroom.whatsapp.Button;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Decides how the bot responds to an inbound message,
  * given where the caller is in the conversation.
  */
 public class ConversationEngine {
+
+    private static final List<Button> LEAGUE_BUTTONS = List.of(
+            new Button("league_pl", "Premier League"),
+            new Button("league_cl", "Champions League"),
+            new Button("league_pd", "La Liga"));
+
+    private static final Map<String, String> LEAGUE_CODES = Map.of(
+            "league_pl", "PL",
+            "league_cl", "CL",
+            "league_pd", "PD"
+    );
 
     /**
      * Works out the caller's next state and what to send back.
@@ -48,69 +60,61 @@ public class ConversationEngine {
             return noneState();
         }
 
-        String button = message.buttonId();
-        switch (button) {
-            case "menu_weather" -> {
-                return Decision.replyWith(ConversationState.AWAITING_CITY,
-                        new Reply.Text("Which city?"));
-            }
-            case "menu_news" -> {
-                return Decision.replyWith(ConversationState.AWAITING_TOPIC,
-                        new Reply.Text("What topic?"));
-            }
-            case "menu_sports" -> {
-                List<Button> leagueButtons = List.of(new Button("league_pl", "Premier League"),
-                        new Button("league_cl", "Champions League"),
-                        new Button("league_ll", "La Liga"));
+        return switch (message.buttonId()) {
+            case "menu_weather" -> cityPromptState();
+            case "menu_news" -> topicPromptState();
+            case "menu_sports" -> leaguePromptState();
+            default -> noneState();
+        };
+    }
 
-                return Decision.replyWith(ConversationState.AWAITING_LEAGUE,
-                        new Reply.Buttons("Which league?", leagueButtons));
-            }
-        }
+    private static Decision cityPromptState() {
+        return Decision.replyWith(ConversationState.AWAITING_CITY, new Reply.Text("Which city?"));
+    }
 
-        return noneState();
+    private static Decision topicPromptState() {
+        return Decision.replyWith(ConversationState.AWAITING_TOPIC, new Reply.Text("What topic?"));
+    }
+
+    private static Decision leaguePromptState() {
+        return Decision.replyWith(ConversationState.AWAITING_LEAGUE,
+                new Reply.Buttons("Which league?", LEAGUE_BUTTONS));
     }
 
     private static Decision lookupCity(WebhookMessage message){
-        return lookupFreeText(message, Lookup.Weather::new);
+        return lookupFreeText(message, Lookup.Weather::new, ConversationEngine::cityPromptState);
     }
 
     private static Decision lookupTopic(WebhookMessage message){
-        return lookupFreeText(message, Lookup.News::new);
+        return lookupFreeText(message, Lookup.News::new, ConversationEngine::topicPromptState);
     }
 
-    private static Decision lookupFreeText(WebhookMessage message, Function<String, Lookup> toLookup){
-        if (message.type() == MessageType.UNSUPPORTED){
-            return noneState();
+    private static Decision lookupFreeText(WebhookMessage message, Function<String, Lookup> toLookup,
+                                            Supplier<Decision> rePrompt){
+        if (message.type() != MessageType.TEXT){
+            return rePrompt.get();
         }
 
         String text = (message.text() == null) ? "" : message.text().trim();
 
         if (text.isBlank()){
-            return noneState();
+            return rePrompt.get();
         }
 
         return Decision.lookUpFor(ConversationState.NONE, toLookup.apply(text));
     }
 
-    private static final Map<String, String> LEAGUE_CODES = Map.of(
-            "league_pl", "PL",
-            "league_cl", "CL",
-            "league_ll", "LL"
-    );
-
     private static Decision lookupLeague(WebhookMessage message){
         if (message.type() != MessageType.BUTTON){
-            return noneState();
+            return leaguePromptState();
         }
 
         String competitionCode = LEAGUE_CODES.get(message.buttonId());
 
         if (competitionCode == null){
-            return noneState();
+            return leaguePromptState();
         }
 
-        return Decision.lookUpFor(ConversationState.NONE,
-                new Lookup.Sports(competitionCode));
+        return Decision.lookUpFor(ConversationState.NONE, new Lookup.Sports(competitionCode));
     }
 }
