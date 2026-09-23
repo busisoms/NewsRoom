@@ -24,6 +24,7 @@ class ConversationEngineTest {
                     new Button("menu_sports", "Sports"),
                     new Button("menu_news", "News")));
 
+
     @ParameterizedTest
     @EnumSource(MessageType.class)
     void noneSendsTheMenuAndMovesToAwaitingOptionForAnyMessageType(MessageType type) {
@@ -31,25 +32,17 @@ class ConversationEngineTest {
 
         assertEquals(ConversationState.AWAITING_OPTION, decision.nextState());
         assertEquals(MENU, decision.reply());
+        assertNull(decision.lookup());
     }
 
     @ParameterizedTest
-    @EnumSource(value = ConversationState.class, names = {"AWAITING_CITY", "AWAITING_TOPIC", "AWAITING_LEAGUE"})
-    void waitingStatesStayPutAndSendNothingForAnyMessageType(ConversationState state) {
-        for (MessageType type : MessageType.values()) {
-            Decision decision = ConversationEngine.decide(state, messageOf(type));
-
-            assertEquals(state, decision.nextState(), "state changed for " + type);
-            assertNull(decision.reply(), "reply sent for " + type);
-        }
-    }
-
-    @Test
-    void awaitingOptionResendsTheMenuAndStaysPutForUnsupportedMessages() {
-        Decision decision = ConversationEngine.decide(ConversationState.AWAITING_OPTION, messageOf(MessageType.UNSUPPORTED));
+    @EnumSource(value = MessageType.class, names = {"TEXT", "UNSUPPORTED"})
+    void awaitingOptionResendsTheMenuForNonButtonMessages(MessageType type) {
+        Decision decision = ConversationEngine.decide(ConversationState.AWAITING_OPTION, messageOf(type));
 
         assertEquals(ConversationState.AWAITING_OPTION, decision.nextState());
         assertEquals(MENU, decision.reply());
+        assertNull(decision.lookup());
     }
 
     @Test
@@ -58,6 +51,7 @@ class ConversationEngineTest {
 
         assertEquals(ConversationState.AWAITING_OPTION, decision.nextState());
         assertEquals(MENU, decision.reply());
+        assertNull(decision.lookup());
     }
 
     @Test
@@ -66,6 +60,7 @@ class ConversationEngineTest {
 
         assertEquals(ConversationState.AWAITING_CITY, decision.nextState());
         assertEquals(new Reply.Text("Which city?"), decision.reply());
+        assertNull(decision.lookup());
     }
 
     @Test
@@ -74,6 +69,7 @@ class ConversationEngineTest {
 
         assertEquals(ConversationState.AWAITING_TOPIC, decision.nextState());
         assertEquals(new Reply.Text("What topic?"), decision.reply());
+        assertNull(decision.lookup());
     }
 
     @Test
@@ -83,6 +79,7 @@ class ConversationEngineTest {
         assertEquals(ConversationState.AWAITING_LEAGUE, decision.nextState());
         Reply.Buttons league = assertInstanceOf(Reply.Buttons.class, decision.reply());
         assertEquals("Which league?", league.body());
+        assertNull(decision.lookup());
     }
 
     @Test
@@ -125,6 +122,94 @@ class ConversationEngineTest {
         long distinct = league.buttons().stream().map(Button::id).distinct().count();
 
         assertEquals(league.buttons().size(), distinct);
+    }
+
+    @Test
+    void awaitingCityWithTextProducesAWeatherLookupAndReturnsToNone() {
+        Decision decision = ConversationEngine.decide(ConversationState.AWAITING_CITY, textMessage("Cape Town"));
+
+        assertEquals(ConversationState.NONE, decision.nextState());
+        assertNull(decision.reply());
+        Lookup.Weather weather = assertInstanceOf(Lookup.Weather.class, decision.lookup());
+        assertEquals("Cape Town", weather.city());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = MessageType.class, names = {"BUTTON", "UNSUPPORTED"})
+    void awaitingCityResendsTheMenuForNonTextMessages(MessageType type) {
+        Decision decision = ConversationEngine.decide(ConversationState.AWAITING_CITY, messageOf(type));
+
+        assertEquals(ConversationState.AWAITING_OPTION, decision.nextState());
+        assertEquals(MENU, decision.reply());
+        assertNull(decision.lookup());
+    }
+
+    @Test
+    void awaitingCityWithBlankTextResendsTheMenuInsteadOfALookup() {
+        Decision decision = ConversationEngine.decide(ConversationState.AWAITING_CITY, textMessage("   "));
+
+        assertEquals(ConversationState.AWAITING_OPTION, decision.nextState());
+        assertEquals(MENU, decision.reply());
+        assertNull(decision.lookup());
+    }
+
+
+    @Test
+    void awaitingTopicWithTextProducesANewsLookupAndReturnsToNone() {
+        Decision decision = ConversationEngine.decide(ConversationState.AWAITING_TOPIC, textMessage("elections"));
+
+        assertEquals(ConversationState.NONE, decision.nextState());
+        assertNull(decision.reply());
+        Lookup.News news = assertInstanceOf(Lookup.News.class, decision.lookup());
+        assertEquals("elections", news.topic());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = MessageType.class, names = {"BUTTON", "UNSUPPORTED"})
+    void awaitingTopicResendsTheMenuForNonTextMessages(MessageType type) {
+        Decision decision = ConversationEngine.decide(ConversationState.AWAITING_TOPIC, messageOf(type));
+
+        assertEquals(ConversationState.AWAITING_OPTION, decision.nextState());
+        assertEquals(MENU, decision.reply());
+        assertNull(decision.lookup());
+    }
+
+    @Test
+    void awaitingTopicWithBlankTextResendsTheMenuInsteadOfALookup() {
+        Decision decision = ConversationEngine.decide(ConversationState.AWAITING_TOPIC, textMessage("   "));
+
+        assertEquals(ConversationState.AWAITING_OPTION, decision.nextState());
+        assertEquals(MENU, decision.reply());
+        assertNull(decision.lookup());
+    }
+
+    @Test
+    void awaitingLeagueWithARecognisedButtonProducesASportsLookupAndReturnsToNone() {
+        Decision decision = ConversationEngine.decide(ConversationState.AWAITING_LEAGUE, buttonMessage("league_pl"));
+
+        assertEquals(ConversationState.NONE, decision.nextState());
+        assertNull(decision.reply());
+        Lookup.Sports sports = assertInstanceOf(Lookup.Sports.class, decision.lookup());
+        assertEquals("PL", sports.competitionCode());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = MessageType.class, names = {"TEXT", "UNSUPPORTED"})
+    void awaitingLeagueResendsTheMenuForNonButtonMessages(MessageType type) {
+        Decision decision = ConversationEngine.decide(ConversationState.AWAITING_LEAGUE, messageOf(type));
+
+        assertEquals(ConversationState.AWAITING_OPTION, decision.nextState());
+        assertEquals(MENU, decision.reply());
+        assertNull(decision.lookup());
+    }
+
+    @Test
+    void awaitingLeagueResendsTheMenuForAnUnrecognisedButtonId() {
+        Decision decision = ConversationEngine.decide(ConversationState.AWAITING_LEAGUE, buttonMessage("league_garbage"));
+
+        assertEquals(ConversationState.AWAITING_OPTION, decision.nextState());
+        assertEquals(MENU, decision.reply());
+        assertNull(decision.lookup());
     }
 
     private static WebhookMessage messageOf(MessageType type) {

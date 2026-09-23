@@ -108,7 +108,7 @@ public class InboundMessageConsumer implements AutoCloseable{
      * resends the reply (harmless) rather than skipping it.
      *
      * <p>Logs one line per message with the wamid, state transition, reply kind,
-     * and delivery count. Never the message text or phone number.
+     * lookup kind, and delivery count. Never the message text or phone number.
      *
      * @param message the caller's inbound message
      * @param delivery how many times the broker has delivered this message (1 on first
@@ -123,8 +123,8 @@ public class InboundMessageConsumer implements AutoCloseable{
         }
         store.updateState(user, decision.nextState());
 
-        log.info("Processed {} {} -> {} reply={} delivery={}", message.wamId(),
-                currentState, decision.nextState(), replyKind(decision.reply()), delivery);
+        log.info("Processed {} {} -> {} reply={} lookup={} delivery={}", message.wamId(),
+                currentState, decision.nextState(), replyKind(decision.reply()), lookupKind(decision.lookup()), delivery);
     }
 
     private static String replyKind(Reply reply) {
@@ -134,6 +134,17 @@ public class InboundMessageConsumer implements AutoCloseable{
         return switch (reply) {
             case Reply.Text text -> "TEXT";
             case Reply.Buttons buttons -> "BUTTONS";
+        };
+    }
+
+    private static String lookupKind(Lookup lookup) {
+        if (lookup == null) {
+            return "none";
+        }
+        return switch (lookup) {
+            case Lookup.Weather weather -> "WEATHER";
+            case Lookup.Sports sports -> "SPORTS";
+            case Lookup.News news -> "NEWS";
         };
     }
 
