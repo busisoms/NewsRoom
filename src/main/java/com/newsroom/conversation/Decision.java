@@ -3,10 +3,12 @@ package com.newsroom.conversation;
 import com.newsroom.session.ConversationState;
 
 /**
- * The engine's output: the next conversation state and an optional reply.
+ * The engine's output: the next conversation state, an optional reply to send
+ * now, and an optional lookup whose result the consumer sends afterwards.
  *
  * @param nextState the state to store after this decision
  * @param reply what to send, or {@code null} when nothing should be sent
+ * @param lookup data to fetch and reply with, or {@code null} when there's nothing to fetch
  */
 public record Decision(ConversationState nextState, Reply reply, Lookup lookup) {
 

@@ -44,7 +44,7 @@ public class InboundMessageConsumer implements AutoCloseable{
      *
      * @param config supplies the broker URL and queue name
      * @param client sends replies back to WhatsApp
-     * @param weatherClient
+     * @param weatherClient fetches current conditions for a {@link Lookup.Weather}
      * @param store holds each caller's conversation state
      * @param dedupe tracks which wamids have already been processed
      */
@@ -122,8 +122,13 @@ public class InboundMessageConsumer implements AutoCloseable{
      * <p>Sends before updating state, so a crash in between means a redelivery
      * resends the reply (harmless) rather than skipping it.
      *
+     * <p>A {@link Lookup} on the decision is resolved and its result sent right after
+     * any immediate reply. A failed lookup sends the {@link LookupException}'s fallback
+     * message and still counts as handled, so it isn't redelivered and retried.
+     *
      * <p>Logs one line per message with the wamid, state transition, reply kind,
-     * lookup kind, and delivery count. Never the message text or phone number.
+     * lookup kind and outcome, and delivery count. Never the message text, the
+     * looked-up city or topic, or the phone number.
      *
      * @param message the caller's inbound message
      * @param delivery how many times the broker has delivered this message (1 on first
@@ -142,14 +147,18 @@ public class InboundMessageConsumer implements AutoCloseable{
             send(user, decision.reply());
         }
 
+        String outcome = "none";
         if (decision.lookup() != null){
-            send(user, resolve(decision.lookup()));
+            LookupResult result = resolve(decision.lookup());
+            send(user, result.reply());
+            outcome = result.outcome();
         }
         store.updateState(user, decision.nextState());
         dedupe.markProcessed(message.wamId());
 
-        log.info("Processed {} {} -> {} reply={} lookup={} delivery={}", message.wamId(),
-                currentState, decision.nextState(), replyKind(decision.reply()), lookupKind(decision.lookup()), delivery);
+        log.info("Processed {} {} -> {} reply={} lookup={} outcome={} delivery={}", message.wamId(),
+                currentState, decision.nextState(), replyKind(decision.reply()), lookupKind(decision.lookup()),
+                outcome, delivery);
     }
 
     private static String replyKind(Reply reply) {
@@ -196,25 +205,46 @@ public class InboundMessageConsumer implements AutoCloseable{
         }
     }
 
-    private Reply resolve(Lookup lookup) {
+    /**
+     * Runs a lookup and turns it into a reply. Never throws {@link LookupException};
+     * any other exception escapes so the message is redelivered.
+     */
+    private LookupResult resolve(Lookup lookup) {
         return switch (lookup) {
             case Lookup.Weather weather -> resolveWeather(weather);
-            case Lookup.Sports sports ->
-                    new Reply.Text("Sports updates aren't ready yet. Try Weather or News.");
-            case Lookup.News news ->
-                    new Reply.Text("News updates aren't ready yet. Try Weather or Sports.");
+            case Lookup.Sports sports -> new LookupResult(
+                    new Reply.Text("Sports updates aren't ready yet. Try Weather."), "not_built");
+            case Lookup.News news -> new LookupResult(
+                    new Reply.Text("News updates aren't ready yet. Try Weather."), "not_built");
         };
     }
 
-    private Reply resolveWeather(Lookup.Weather lookup) {
+    /**
+     * A not-found city is an ordinary outcome (usually a typo), so it's logged
+     * quietly. Only an unavailable service is a warning with the stack trace.
+     * The exception message is the client's technical detail, never the city.
+     */
+    private LookupResult resolveWeather(Lookup.Weather lookup) {
         try {
             CurrentWeather weather = weatherClient.current(lookup.city());
-            return ReplyFormatter.weather(weather);
+            return new LookupResult(ReplyFormatter.weather(weather), "ok");
         } catch (LookupException e) {
-            log.warn("Weather lookup for '{}' failed: {}", lookup.city(), e.getMessage(), e);
-            return new Reply.Text(e.fallbackMessage());
+            if (e.reason() == LookupException.Reason.NOT_FOUND) {
+                log.info("Weather lookup found nothing: {}", e.getMessage());
+            } else {
+                log.warn("Weather lookup failed: {}", e.getMessage(), e);
+            }
+            return new LookupResult(new Reply.Text(e.fallbackMessage()), e.reason().name());
         }
     }
+
+    /**
+     * What a lookup produced: the reply to send, and a short outcome for the log.
+     *
+     * @param reply the formatted result or the fallback message
+     * @param outcome {@code ok}, a {@link LookupException.Reason} name, or {@code not_built}
+     */
+    private record LookupResult(Reply reply, String outcome) {}
 
 
     /**
