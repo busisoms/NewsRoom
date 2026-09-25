@@ -97,12 +97,12 @@ class ReplyFormatterTest {
         Reply reply = ReplyFormatter.sports(result);
 
         assertEquals(new Reply.Text("""
-                UEFA Champions League this week
+                UEFA Champions League
 
-                Results:
+                Recent results:
                 Club Brugge 2-3 Aston Villa
 
-                Fixtures:
+                Upcoming fixtures:
                 RC Lens v Sporting CP — Tue 13 Oct 16:45 UTC"""), reply);
     }
 
@@ -115,9 +115,9 @@ class ReplyFormatterTest {
         Reply reply = ReplyFormatter.sports(result);
 
         assertEquals(new Reply.Text("""
-                Premier League this week
+                Premier League
 
-                Results:
+                Recent results:
                 Arsenal 1-0 Chelsea"""), reply);
     }
 
@@ -130,9 +130,9 @@ class ReplyFormatterTest {
         Reply reply = ReplyFormatter.sports(result);
 
         assertEquals(new Reply.Text("""
-                Premier League this week
+                Premier League
 
-                Fixtures:
+                Upcoming fixtures:
                 Arsenal v Chelsea — Tue 8 Sep 16:45 UTC"""), reply);
     }
 }

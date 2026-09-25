@@ -48,7 +48,7 @@ public class InboundMessageConsumer implements AutoCloseable{
      * @param config supplies the broker URL and queue name
      * @param client sends replies back to WhatsApp
      * @param weatherClient fetches current conditions for a {@link Lookup.Weather}
-     * @param sportsClient fetches this week's matches for a {@link Lookup.Sports}
+     * @param sportsClient fetches recent results and upcoming fixtures for a {@link Lookup.Sports}
      * @param store holds each caller's conversation state
      * @param dedupe tracks which wamids have already been processed
      */
@@ -243,7 +243,7 @@ public class InboundMessageConsumer implements AutoCloseable{
     }
 
     /**
-     * A not-found competition (no matches this week) is an ordinary outcome, so it's
+     * A not-found competition (no matches in the window around today) is an ordinary outcome, so it's
      * logged quietly. Only an unavailable service is a warning with the stack trace.
      * The exception message is the client's technical detail, never the competition code.
      */

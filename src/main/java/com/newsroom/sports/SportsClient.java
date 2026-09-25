@@ -11,16 +11,16 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Clock;
-import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
- * Fetches this week's matches for a competition from football-data.org.
+ * Fetches a competition's recent results and upcoming fixtures from football-data.org.
  *
  * <p>Every failure surfaces as a {@link LookupException} with a
  * {@link LookupException.Reason}, so the consumer catches one type and
@@ -31,9 +31,15 @@ public class SportsClient {
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final int MAX_PER_LIST = 5;
 
-    /** Sent to the user when the competition has no matches in the current week. */
+    /**
+     * How far either side of today to look. Wide enough to reach past an international
+     * break, so "upcoming fixtures" isn't empty when nothing is left to play this week.
+     */
+    private static final int WINDOW_DAYS = 14;
+
+    /** Sent to the user when the competition has no matches in the window around today. */
     static final String NOT_FOUND_MESSAGE =
-            "No matches this week for that competition. Send any message to see the menu and try again.";
+            "I couldn't find any recent or upcoming matches for that competition. Send any message to see the menu and try again.";
 
     /** Sent to the user for any transport, status, or parsing failure. */
     static final String UNAVAILABLE_MESSAGE =
@@ -62,19 +68,19 @@ public class SportsClient {
     }
 
     /**
-     * Fetches this week's matches for a competition, split into fixtures and results.
+     * Fetches the matches within 14 days either side of today, split into fixtures and results.
      *
      * @param competitionCode the competition's code, e.g. {@code "PL"}
      * @return at most 5 fixtures and 5 results
-     * @throws LookupException {@code NOT_FOUND} if the competition has no matches this week,
+     * @throws LookupException {@code NOT_FOUND} if the competition has no matches in that window,
      *                         {@code UNAVAILABLE} for any transport, status, or parsing failure
      */
     public SportsResult matches(String competitionCode) {
-        LocalDate weekStart = LocalDate.now(clock).with(DayOfWeek.MONDAY);
-        LocalDate weekEnd = weekStart.plusDays(6);
+        LocalDate today = LocalDate.now(clock);
 
         String url = baseUrl + "/competitions/" + competitionCode + "/matches"
-                + "?dateFrom=" + weekStart + "&dateTo=" + weekEnd;
+                + "?dateFrom=" + today.minusDays(WINDOW_DAYS)
+                + "&dateTo=" + today.plusDays(WINDOW_DAYS);
 
         return parse(get(url));
     }
@@ -144,17 +150,17 @@ public class SportsClient {
             String status = requireText(match, "status", "match");
 
             if (status.equals("FINISHED")) {
-                if (results.size() < MAX_PER_LIST) {
-                    results.add(readMatch(match, true));
-                }
+                results.add(readMatch(match, true));
             } else if (status.equals("TIMED") || status.equals("SCHEDULED")) {
-                if (fixtures.size() < MAX_PER_LIST) {
-                    fixtures.add(readMatch(match, false));
-                }
+                fixtures.add(readMatch(match, false));
             }
         }
 
-        return new SportsResult(competitionName, fixtures, results);
+        Comparator<Match> byKickoff = Comparator.comparing(Match::utcDate);
+
+        return new SportsResult(competitionName,
+                fixtures.stream().sorted(byKickoff).limit(MAX_PER_LIST).toList(),
+                results.stream().sorted(byKickoff.reversed()).limit(MAX_PER_LIST).toList());
     }
 
     private static Match readMatch(JsonNode match, boolean withScore) {

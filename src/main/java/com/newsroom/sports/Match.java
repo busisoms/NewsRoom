@@ -3,7 +3,7 @@ package com.newsroom.sports;
 import java.time.Instant;
 
 /**
- * One match in a competition's this-week window.
+ * One match in a competition.
  *
  * @param homeTeam the home team's short name
  * @param awayTeam the away team's short name

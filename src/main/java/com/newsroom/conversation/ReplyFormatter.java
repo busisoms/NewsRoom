@@ -43,21 +43,21 @@ public class ReplyFormatter {
 
 
     /**
-     * Formats a competition's this-week matches as results (score first) followed
-     * by fixtures (kickoff time), each on its own line. A section is left out
-     * entirely if it has no matches.
+     * Formats a competition's recent results (score first) followed by its upcoming
+     * fixtures (kickoff time), each on its own line. A section is left out entirely
+     * if it has no matches.
      *
      * @param result at most 5 fixtures and 5 results, as fetched from football-data.org
      * @return a text reply
      */
     public static Reply sports(SportsResult result) {
-        StringBuilder body = new StringBuilder(result.competitionName()).append(" this week");
+        StringBuilder body = new StringBuilder(result.competitionName());
 
         if (!result.results().isEmpty()) {
-            body.append("\n\nResults:\n").append(formatResults(result.results()));
+            body.append("\n\nRecent results:\n").append(formatResults(result.results()));
         }
         if (!result.fixtures().isEmpty()) {
-            body.append("\n\nFixtures:\n").append(formatFixtures(result.fixtures()));
+            body.append("\n\nUpcoming fixtures:\n").append(formatFixtures(result.fixtures()));
         }
 
         return new Reply.Text(body.toString());
@@ -72,7 +72,7 @@ public class ReplyFormatter {
 
     private static String formatFixtures(List<Match> matches) {
         return matches.stream()
-                .map(m -> String.format(Locale.ROOT, "%s v %s — %s UTC",
+                .map(m -> String.format(Locale.ROOT, "%s v %s -> %s UTC",
                         m.homeTeam(), m.awayTeam(), KICKOFF_FORMAT.format(m.utcDate())))
                 .collect(Collectors.joining("\n"));
     }
