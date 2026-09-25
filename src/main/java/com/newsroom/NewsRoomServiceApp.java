@@ -4,12 +4,14 @@ import com.newsroom.config.Config;
 import com.newsroom.queue.DedupeStore;
 import com.newsroom.queue.InboundMessageConsumer;
 import com.newsroom.queue.InboundMessagePublisher;
+import com.newsroom.sports.SportsClient;
 import com.newsroom.weather.WeatherClient;
 import com.newsroom.webhook.WebhookController;
 import com.newsroom.whatsapp.WhatsAppClient;
 import com.newsroom.session.SessionStore;
 import io.javalin.Javalin;
 
+import java.time.Clock;
 import java.time.Duration;
 
 public class NewsRoomServiceApp {
@@ -26,14 +28,22 @@ public class NewsRoomServiceApp {
         this.producer = new InboundMessagePublisher(config);
         this.controller = new WebhookController(config, producer);
         WhatsAppClient outboundClient = new WhatsAppClient(config);
+
         WeatherClient weatherClient = new WeatherClient(
                 config.weatherGeocodingUrl(),
                 config.weatherForecastUrl(),
                 Duration.ofSeconds(config.externalTimeoutSeconds()));
+
+        SportsClient sportsClient = new SportsClient(
+                config.footballDataBaseUrl(),
+                config.footballDataApiKey(),
+                Duration.ofSeconds(config.externalTimeoutSeconds()),
+                Clock.systemUTC());
+
         SessionStore store = new SessionStore(config.sessionTimeoutMinutes());
         DedupeStore dedupe = new DedupeStore(config.dedupeWindowMinutes());
         this.consumer = new InboundMessageConsumer(config, outboundClient,
-                weatherClient, store, dedupe);
+                weatherClient, sportsClient, store, dedupe);
     }
 
     private void register(){

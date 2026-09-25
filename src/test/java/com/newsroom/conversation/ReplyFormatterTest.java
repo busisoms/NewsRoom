@@ -1,9 +1,13 @@
 package com.newsroom.conversation;
 
+import com.newsroom.sports.Match;
+import com.newsroom.sports.SportsResult;
 import com.newsroom.weather.CurrentWeather;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -82,5 +86,53 @@ class ReplyFormatterTest {
                 Cape Town, South Africa
                 16.7°C, Overcast
                 Wind 15.1 km/h · humidity 87%"""), reply);
+    }
+
+    @Test
+    void sportsShowsResultsThenFixtures() {
+        SportsResult result = new SportsResult("UEFA Champions League",
+                List.of(new Match("RC Lens", "Sporting CP", Instant.parse("2026-10-13T16:45:00Z"), null, null)),
+                List.of(new Match("Club Brugge", "Aston Villa", Instant.parse("2026-09-08T16:45:00Z"), 2, 3)));
+
+        Reply reply = ReplyFormatter.sports(result);
+
+        assertEquals(new Reply.Text("""
+                UEFA Champions League this week
+
+                Results:
+                Club Brugge 2-3 Aston Villa
+
+                Fixtures:
+                RC Lens v Sporting CP — Tue 13 Oct 16:45 UTC"""), reply);
+    }
+
+    @Test
+    void sportsWithOnlyResultsLeavesOutFixturesSection() {
+        SportsResult result = new SportsResult("Premier League",
+                List.of(),
+                List.of(new Match("Arsenal", "Chelsea", Instant.parse("2026-09-08T16:45:00Z"), 1, 0)));
+
+        Reply reply = ReplyFormatter.sports(result);
+
+        assertEquals(new Reply.Text("""
+                Premier League this week
+
+                Results:
+                Arsenal 1-0 Chelsea"""), reply);
+    }
+
+    @Test
+    void sportsWithOnlyFixturesLeavesOutResultsSection() {
+        SportsResult result = new SportsResult("Premier League",
+                List.of(new Match("Arsenal", "Chelsea", Instant.parse("2026-09-08T16:45:00Z"), null, null)),
+                List.of());
+
+        Reply reply = ReplyFormatter.sports(result);
+
+        assertEquals(new Reply.Text("""
+                Premier League this week
+
+                Fixtures:
+                Arsenal v Chelsea — Tue 8 Sep 16:45 UTC"""), reply);
     }
 }

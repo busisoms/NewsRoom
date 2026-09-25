@@ -1,14 +1,22 @@
 package com.newsroom.conversation;
 
+import com.newsroom.sports.Match;
+import com.newsroom.sports.SportsResult;
 import com.newsroom.weather.CurrentWeather;
 
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Locale;
+import java.util.stream.Collectors;
 
 /**
  * Turns lookup results into the {@link Reply} sent to the user.
  * Stateless; kept short so it reads well on a phone.
  */
 public class ReplyFormatter {
+    private static final DateTimeFormatter KICKOFF_FORMAT =
+            DateTimeFormatter.ofPattern("EEE d MMM HH:mm", Locale.ROOT).withZone(ZoneOffset.UTC);
 
     /**
      * Formats current conditions as three lines: place, temperature and
@@ -31,6 +39,42 @@ public class ReplyFormatter {
                 place,
                 weather.temperatureCelsius(), label(weather.weatherCode()),
                 weather.windKmh(), weather.humidityPercent()));
+    }
+
+
+    /**
+     * Formats a competition's this-week matches as results (score first) followed
+     * by fixtures (kickoff time), each on its own line. A section is left out
+     * entirely if it has no matches.
+     *
+     * @param result at most 5 fixtures and 5 results, as fetched from football-data.org
+     * @return a text reply
+     */
+    public static Reply sports(SportsResult result) {
+        StringBuilder body = new StringBuilder(result.competitionName()).append(" this week");
+
+        if (!result.results().isEmpty()) {
+            body.append("\n\nResults:\n").append(formatResults(result.results()));
+        }
+        if (!result.fixtures().isEmpty()) {
+            body.append("\n\nFixtures:\n").append(formatFixtures(result.fixtures()));
+        }
+
+        return new Reply.Text(body.toString());
+    }
+
+    private static String formatResults(List<Match> matches) {
+        return matches.stream()
+                .map(m -> String.format(Locale.ROOT, "%s %d-%d %s",
+                        m.homeTeam(), m.homeScore(), m.awayScore(), m.awayTeam()))
+                .collect(Collectors.joining("\n"));
+    }
+
+    private static String formatFixtures(List<Match> matches) {
+        return matches.stream()
+                .map(m -> String.format(Locale.ROOT, "%s v %s — %s UTC",
+                        m.homeTeam(), m.awayTeam(), KICKOFF_FORMAT.format(m.utcDate())))
+                .collect(Collectors.joining("\n"));
     }
 
     /**

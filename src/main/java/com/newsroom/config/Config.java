@@ -16,6 +16,8 @@ package com.newsroom.config;
  *                            redelivered copy of the same message
  * @param weatherGeocodingUrl base URL for the Open-Meteo geocoding API
  * @param weatherForecastUrl base URL for the Open-Meteo forecast API
+ * @param footballDataApiKey API key for football-data.org, sent as the {@code X-Auth-Token} header
+ * @param footballDataBaseUrl base URL for the football-data.org API
  */
 public record Config(
         int port,
@@ -29,7 +31,9 @@ public record Config(
         int dedupeWindowMinutes,
         String weatherGeocodingUrl,
         String weatherForecastUrl,
-        int externalTimeoutSeconds
+        int externalTimeoutSeconds,
+        String footballDataApiKey,
+        String footballDataBaseUrl
 ) {
 
     /**
@@ -52,6 +56,8 @@ public record Config(
         String forecastUrl = env("WEATHER_FORECAST_URL",
                 "https://api.open-meteo.com/v1/forecast");
         String externalTimeout = env("EXTERNAL_TIMEOUT_SECONDS", "5");
+        String footballDataApiKey = env("FOOTBALL_DATA_API_KEY", null);
+        String footballDataBaseUrl = env("FOOTBALL_DATA_BASE_URL", "https://api.football-data.org/v4");
 
         String[] keys = {
                 "PORT", "META_ACCESS_TOKEN",
@@ -59,14 +65,16 @@ public record Config(
                 "ACTIVEMQ_BROKER_QUEUE", "WEBHOOK_VERIFY_TOKEN",
                 "META_APP_SECRET", "SESSION_TIMEOUT_MINUTES",
                 "DEDUPE_WINDOW_MINUTES", "WEATHER_GEOCODING_URL",
-                "WEATHER_FORECAST_URL", "EXTERNAL_TIMEOUT_SECONDS"
+                "WEATHER_FORECAST_URL", "EXTERNAL_TIMEOUT_SECONDS",
+                "FOOTBALL_DATA_API_KEY", "FOOTBALL_DATA_BASE_URL"
         };
 
         String[] values = {
                 port, accessToken, phoneNumberId,
                 broker, queue, webhookToken,
                 metaAppSecret, timeout, dedupeWindow,
-                geocodingUrl, forecastUrl, externalTimeout
+                geocodingUrl, forecastUrl, externalTimeout,
+                footballDataApiKey, footballDataBaseUrl
         };
 
         String missing = missingKeys(keys, values);
@@ -81,7 +89,8 @@ public record Config(
                 queue, webhookToken,
                 metaAppSecret, Integer.parseInt(timeout),
                 Integer.parseInt(dedupeWindow),
-                geocodingUrl, forecastUrl, Integer.parseInt(externalTimeout)
+                geocodingUrl, forecastUrl, Integer.parseInt(externalTimeout),
+                footballDataApiKey, footballDataBaseUrl
         );
     }
 

@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.newsroom.config.Config;
 import com.newsroom.conversation.*;
 import com.newsroom.session.*;
+import com.newsroom.sports.SportsClient;
+import com.newsroom.sports.SportsResult;
 import com.newsroom.weather.CurrentWeather;
 import com.newsroom.weather.WeatherClient;
 import com.newsroom.webhook.WebhookMessage;
@@ -32,6 +34,7 @@ public class InboundMessageConsumer implements AutoCloseable{
     private final Config config;
     private final WhatsAppClient client;
     private final WeatherClient weatherClient;
+    private final SportsClient sportsClient;
     private final SessionStore store;
     private final DedupeStore dedupe;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -45,15 +48,17 @@ public class InboundMessageConsumer implements AutoCloseable{
      * @param config supplies the broker URL and queue name
      * @param client sends replies back to WhatsApp
      * @param weatherClient fetches current conditions for a {@link Lookup.Weather}
+     * @param sportsClient fetches this week's matches for a {@link Lookup.Sports}
      * @param store holds each caller's conversation state
      * @param dedupe tracks which wamids have already been processed
      */
     public InboundMessageConsumer(Config config, WhatsAppClient client,
-                                  WeatherClient weatherClient,
+                                  WeatherClient weatherClient, SportsClient sportsClient,
                                   SessionStore store, DedupeStore dedupe) {
         this.config = config;
         this.client = client;
         this.weatherClient = weatherClient;
+        this.sportsClient = sportsClient;
         this.store = store;
         this.dedupe = dedupe;
     }
@@ -212,8 +217,7 @@ public class InboundMessageConsumer implements AutoCloseable{
     private LookupResult resolve(Lookup lookup) {
         return switch (lookup) {
             case Lookup.Weather weather -> resolveWeather(weather);
-            case Lookup.Sports sports -> new LookupResult(
-                    new Reply.Text("Sports updates aren't ready yet. Try Weather."), "not_built");
+            case Lookup.Sports sports -> resolveSports(sports);
             case Lookup.News news -> new LookupResult(
                     new Reply.Text("News updates aren't ready yet. Try Weather."), "not_built");
         };
@@ -233,6 +237,25 @@ public class InboundMessageConsumer implements AutoCloseable{
                 log.info("Weather lookup found nothing: {}", e.getMessage());
             } else {
                 log.warn("Weather lookup failed: {}", e.getMessage(), e);
+            }
+            return new LookupResult(new Reply.Text(e.fallbackMessage()), e.reason().name());
+        }
+    }
+
+    /**
+     * A not-found competition (no matches this week) is an ordinary outcome, so it's
+     * logged quietly. Only an unavailable service is a warning with the stack trace.
+     * The exception message is the client's technical detail, never the competition code.
+     */
+    private LookupResult resolveSports(Lookup.Sports lookup) {
+        try {
+            SportsResult result = sportsClient.matches(lookup.competitionCode());
+            return new LookupResult(ReplyFormatter.sports(result), "ok");
+        } catch (LookupException e) {
+            if (e.reason() == LookupException.Reason.NOT_FOUND) {
+                log.info("Sports lookup found nothing: {}", e.getMessage());
+            } else {
+                log.warn("Sports lookup failed: {}", e.getMessage(), e);
             }
             return new LookupResult(new Reply.Text(e.fallbackMessage()), e.reason().name());
         }
