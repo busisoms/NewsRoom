@@ -103,7 +103,7 @@ class ReplyFormatterTest {
                 Club Brugge 2-3 Aston Villa
 
                 Upcoming fixtures:
-                RC Lens v Sporting CP — Tue 13 Oct 16:45 UTC"""), reply);
+                RC Lens v Sporting CP -> Tue 13 Oct 16:45 UTC"""), reply);
     }
 
     @Test
@@ -133,6 +133,6 @@ class ReplyFormatterTest {
                 Premier League
 
                 Upcoming fixtures:
-                Arsenal v Chelsea — Tue 8 Sep 16:45 UTC"""), reply);
+                Arsenal v Chelsea -> Tue 8 Sep 16:45 UTC"""), reply);
     }
 }
