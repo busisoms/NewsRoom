@@ -1,0 +1,97 @@
+{
+  "competition": {
+    "name": "UEFA Champions League"
+  },
+  "matches": [
+    {
+      "utcDate": "2026-09-08T16:45:00Z",
+      "status": "FINISHED",
+      "homeTeam": {
+        "name": "Club Brugge KV",
+        "shortName": "Club Brugge"
+      },
+      "awayTeam": {
+        "name": "Aston Villa FC",
+        "shortName": "Aston Villa"
+      },
+      "score": {
+        "fullTime": {
+          "home": 2,
+          "away": 3
+        }
+      }
+    },
+    {
+      "utcDate": "2026-09-08T16:45:00Z",
+      "status": "FINISHED",
+      "homeTeam": {
+        "name": "PAE AEK",
+        "shortName": "PAE AEK"
+      },
+      "awayTeam": {
+        "name": "LASK Linz",
+        "shortName": "LASK"
+      },
+      "score": {
+        "fullTime": {
+          "home": 1,
+          "away": 0
+        }
+      }
+    },
+    {
+      "utcDate": "2026-10-13T16:45:00Z",
+      "status": "TIMED",
+      "homeTeam": {
+        "name": "Racing Club de Lens",
+        "shortName": "RC Lens"
+      },
+      "awayTeam": {
+        "name": "Sporting Clube de Portugal",
+        "shortName": "Sporting CP"
+      },
+      "score": {
+        "fullTime": {
+          "home": null,
+          "away": null
+        }
+      }
+    },
+    {
+      "utcDate": "2026-10-13T16:45:00Z",
+      "status": "TIMED",
+      "homeTeam": {
+        "name": "Sabah FK",
+        "shortName": "Sabah FK"
+      },
+      "awayTeam": {
+        "name": "SK Slavia Praha",
+        "shortName": "Slavia Praha"
+      },
+      "score": {
+        "fullTime": {
+          "home": null,
+          "away": null
+        }
+      }
+    },
+    {
+      "utcDate": "2026-10-13T19:00:00Z",
+      "status": "TIMED",
+      "homeTeam": {
+        "name": "FC Internazionale Milano",
+        "shortName": "Inter"
+      },
+      "awayTeam": {
+        "name": "Club Brugge KV",
+        "shortName": "Club Brugge"
+      },
+      "score": {
+        "fullTime": {
+          "home": null,
+          "away": null
+        }
+      }
+    }
+  ]
+}

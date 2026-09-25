@@ -1,0 +1,25 @@
+{
+  "competition": {
+    "name": "UEFA Champions League"
+  },
+  "matches": [
+    {
+      "utcDate": "2026-09-08T16:45:00Z",
+      "status": "FINISHED",
+      "homeTeam": {
+        "name": "Club Brugge KV",
+        "shortName": "Club Brugge"
+      },
+      "awayTeam": {
+        "name": "Aston Villa FC",
+        "shortName": "Aston Villa"
+      },
+      "score": {
+        "fullTime": {
+          "home": null,
+          "away": null
+        }
+      }
+    }
+  ]
+}

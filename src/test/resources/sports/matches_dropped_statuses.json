@@ -1,0 +1,61 @@
+{
+  "competition": {
+    "name": "UEFA Champions League"
+  },
+  "matches": [
+    {
+      "utcDate": "2026-09-08T19:00:00Z",
+      "status": "POSTPONED",
+      "homeTeam": {
+        "name": "Real Madrid CF",
+        "shortName": "Real Madrid"
+      },
+      "awayTeam": {
+        "name": "FC Internazionale Milano",
+        "shortName": "Inter"
+      },
+      "score": {
+        "fullTime": {
+          "home": 2,
+          "away": 1
+        }
+      }
+    },
+    {
+      "utcDate": "2026-10-13T19:00:00Z",
+      "status": "CANCELLED",
+      "homeTeam": {
+        "name": "Galatasaray SK",
+        "shortName": "Galatasaray"
+      },
+      "awayTeam": {
+        "name": "FC Barcelona",
+        "shortName": "Bar\u00e7a"
+      },
+      "score": {
+        "fullTime": {
+          "home": null,
+          "away": null
+        }
+      }
+    },
+    {
+      "utcDate": "2026-09-08T19:00:00Z",
+      "status": "FINISHED",
+      "homeTeam": {
+        "name": "FC Porto",
+        "shortName": "Porto"
+      },
+      "awayTeam": {
+        "name": "Manchester City FC",
+        "shortName": "Man City"
+      },
+      "score": {
+        "fullTime": {
+          "home": 0,
+          "away": 2
+        }
+      }
+    }
+  ]
+}
