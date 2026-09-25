@@ -28,7 +28,8 @@ public record Config(
         int sessionTimeoutMinutes,
         int dedupeWindowMinutes,
         String weatherGeocodingUrl,
-        String weatherForecastUrl
+        String weatherForecastUrl,
+        int externalTimeoutSeconds
 ) {
 
     /**
@@ -50,6 +51,7 @@ public record Config(
                 "https://geocoding-api.open-meteo.com/v1/search");
         String forecastUrl = env("WEATHER_FORECAST_URL",
                 "https://api.open-meteo.com/v1/forecast");
+        String externalTimeout = env("EXTERNAL_TIMEOUT_SECONDS", "5");
 
         String[] keys = {
                 "PORT", "META_ACCESS_TOKEN",
@@ -57,14 +59,14 @@ public record Config(
                 "ACTIVEMQ_BROKER_QUEUE", "WEBHOOK_VERIFY_TOKEN",
                 "META_APP_SECRET", "SESSION_TIMEOUT_MINUTES",
                 "DEDUPE_WINDOW_MINUTES", "WEATHER_GEOCODING_URL",
-                "WEATHER_FORECAST_URL"
+                "WEATHER_FORECAST_URL", "EXTERNAL_TIMEOUT_SECONDS"
         };
 
         String[] values = {
                 port, accessToken, phoneNumberId,
                 broker, queue, webhookToken,
                 metaAppSecret, timeout, dedupeWindow,
-                geocodingUrl, forecastUrl
+                geocodingUrl, forecastUrl, externalTimeout
         };
 
         String missing = missingKeys(keys, values);
@@ -79,7 +81,7 @@ public record Config(
                 queue, webhookToken,
                 metaAppSecret, Integer.parseInt(timeout),
                 Integer.parseInt(dedupeWindow),
-                geocodingUrl, forecastUrl
+                geocodingUrl, forecastUrl, Integer.parseInt(externalTimeout)
         );
     }
 

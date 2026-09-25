@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.newsroom.config.Config;
 import com.newsroom.conversation.*;
 import com.newsroom.session.*;
+import com.newsroom.weather.CurrentWeather;
+import com.newsroom.weather.WeatherClient;
 import com.newsroom.webhook.WebhookMessage;
 import com.newsroom.whatsapp.WhatsAppClient;
 import org.apache.activemq.ActiveMQConnectionFactory;
@@ -29,6 +31,7 @@ import javax.jms.*;
 public class InboundMessageConsumer implements AutoCloseable{
     private final Config config;
     private final WhatsAppClient client;
+    private final WeatherClient weatherClient;
     private final SessionStore store;
     private final DedupeStore dedupe;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -41,12 +44,16 @@ public class InboundMessageConsumer implements AutoCloseable{
      *
      * @param config supplies the broker URL and queue name
      * @param client sends replies back to WhatsApp
+     * @param weatherClient
      * @param store holds each caller's conversation state
      * @param dedupe tracks which wamids have already been processed
      */
-    public InboundMessageConsumer(Config config, WhatsAppClient client, SessionStore store, DedupeStore dedupe) {
+    public InboundMessageConsumer(Config config, WhatsAppClient client,
+                                  WeatherClient weatherClient,
+                                  SessionStore store, DedupeStore dedupe) {
         this.config = config;
         this.client = client;
+        this.weatherClient = weatherClient;
         this.store = store;
         this.dedupe = dedupe;
     }
@@ -134,6 +141,10 @@ public class InboundMessageConsumer implements AutoCloseable{
         if (decision.reply() != null) {
             send(user, decision.reply());
         }
+
+        if (decision.lookup() != null){
+            send(user, resolve(decision.lookup()));
+        }
         store.updateState(user, decision.nextState());
         dedupe.markProcessed(message.wamId());
 
@@ -182,6 +193,26 @@ public class InboundMessageConsumer implements AutoCloseable{
         switch (reply) {
             case Reply.Text text -> client.sendText(to, text.body());
             case Reply.Buttons buttons -> client.sendButtons(to, buttons.body(), buttons.buttons());
+        }
+    }
+
+    private Reply resolve(Lookup lookup) {
+        return switch (lookup) {
+            case Lookup.Weather weather -> resolveWeather(weather);
+            case Lookup.Sports sports ->
+                    new Reply.Text("Sports updates aren't ready yet. Try Weather or News.");
+            case Lookup.News news ->
+                    new Reply.Text("News updates aren't ready yet. Try Weather or Sports.");
+        };
+    }
+
+    private Reply resolveWeather(Lookup.Weather lookup) {
+        try {
+            CurrentWeather weather = weatherClient.current(lookup.city());
+            return ReplyFormatter.weather(weather);
+        } catch (LookupException e) {
+            log.warn("Weather lookup for '{}' failed: {}", lookup.city(), e.getMessage(), e);
+            return new Reply.Text(e.fallbackMessage());
         }
     }
 
