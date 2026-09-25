@@ -14,6 +14,8 @@ package com.newsroom.config;
  * @param sessionTimeoutMinutes how long a user's conversation session stays alive without activity
  * @param dedupeWindowMinutes how long a processed wamid is remembered, to skip a retried or
  *                            redelivered copy of the same message
+ * @param weatherGeocodingUrl base URL for the Open-Meteo geocoding API
+ * @param weatherForecastUrl base URL for the Open-Meteo forecast API
  */
 public record Config(
         int port,
@@ -24,7 +26,9 @@ public record Config(
         String webhookVerifyToken,
         String metaAppSecret,
         int sessionTimeoutMinutes,
-        int dedupeWindowMinutes
+        int dedupeWindowMinutes,
+        String weatherGeocodingUrl,
+        String weatherForecastUrl
 ) {
 
     /**
@@ -42,19 +46,25 @@ public record Config(
         String metaAppSecret = env("META_APP_SECRET", null);
         String timeout = env("SESSION_TIMEOUT_MINUTES", "30");
         String dedupeWindow = env("DEDUPE_WINDOW_MINUTES", "5");
+        String geocodingUrl = env("WEATHER_GEOCODING_URL",
+                "https://geocoding-api.open-meteo.com/v1/search");
+        String forecastUrl = env("WEATHER_FORECAST_URL",
+                "https://api.open-meteo.com/v1/forecast");
 
         String[] keys = {
                 "PORT", "META_ACCESS_TOKEN",
                 "META_PHONE_NUMBER_ID", "ACTIVEMQ_BROKER_URL",
                 "ACTIVEMQ_BROKER_QUEUE", "WEBHOOK_VERIFY_TOKEN",
                 "META_APP_SECRET", "SESSION_TIMEOUT_MINUTES",
-                "DEDUPE_WINDOW_MINUTES"
+                "DEDUPE_WINDOW_MINUTES", "WEATHER_GEOCODING_URL",
+                "WEATHER_FORECAST_URL"
         };
 
         String[] values = {
                 port, accessToken, phoneNumberId,
                 broker, queue, webhookToken,
-                metaAppSecret, timeout, dedupeWindow
+                metaAppSecret, timeout, dedupeWindow,
+                geocodingUrl, forecastUrl
         };
 
         String missing = missingKeys(keys, values);
@@ -68,7 +78,8 @@ public record Config(
                 phoneNumberId, broker,
                 queue, webhookToken,
                 metaAppSecret, Integer.parseInt(timeout),
-                Integer.parseInt(dedupeWindow)
+                Integer.parseInt(dedupeWindow),
+                geocodingUrl, forecastUrl
         );
     }
 
